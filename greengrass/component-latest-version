@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+SCOPE=$1
+COMPONENT_ARN=$2
+
+if [ -z "$SCOPE" ]; then
+    echo "Usage: $0 <scope> <component-arn>"
+    exit 1
+fi
+
+if [ -z "$COMPONENT_ARN" ]; then
+    echo "Usage: $0 <scope> <component-arn>"
+    exit 1
+fi
+
+aws greengrassv2 list-components --scope "$SCOPE" --query 'components[?arn==`'$COMPONENT_ARN'`].latestVersion.componentVersion' --output text

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+COMPONENT_PATH=$1
+
+SCRIPT_PATH=$(dirname -- "${BASH_SOURCE[0]}") || {
+  >&2 echo "Could not find the script directory. Exiting."
+  exit 1
+}
+. "$SCRIPT_PATH"/shared.sh
+
+validate_component "$COMPONENT_PATH"
+require_cli
+
+set -e
+
+cd "$COMPONENT_PATH"
+COMPONENT_NAME=$(component_name)
+COMPONENT_ARN="arn:aws:greengrass:$REGION:$ACCOUNT_ID:components:$COMPONENT_NAME"
+LATEST_VERSION=$(component-latest-version "PRIVATE" "$COMPONENT_ARN")
+gg-cli deployment create --merge "$COMPONENT_NAME=$LATEST_VERSION" --update-config="{ \"$COMPONENT_NAME\": { \"RESET\": [\"\"] } }"

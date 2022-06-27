@@ -1,0 +1,107 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/focal64"
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = 1024
+  end
+
+  # Do not sync the current folder in the default location vagrant uses (i.e. /vagrant)
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  # Greengrass debug console
+  config.vm.network "forwarded_port", guest: 1441, host: 1441, protocol: "tcp"
+  # Greengrass debug console (websocket)
+  config.vm.network "forwarded_port", guest: 1442, host: 1442, protocol: "tcp"
+
+  # Make the shared directory on the host if necessary. Don't commit this into the repo. It is confusing to have
+  #   the shared directory in the user's HOME directory and a copy of the shared directory in the repo.
+  shared_dir = File.join(__dir__, "../shared")
+  Dir.mkdir(shared_dir) unless File.exists?(shared_dir)
+
+  # Enable USB Controller on VirtualBox but only during the initial provisioning or if the user requests it
+  if (not provisioned?) || explicit_provisioning?
+    config.vm.provider "virtualbox" do |vb|
+      vb.customize ["modifyvm", :id, "--usb", "on"]
+      vb.customize ["modifyvm", :id, "--usbxhci", "on"]
+      # Add the Logitech C922 webcam for convenience
+      vb.customize ["usbfilter", "add", "0", "--target", :id, "--name", "Logitech, Inc. C922 Pro Stream Webcam","--vendorid", "046d", "--productid", "085c"]
+    end
+  end
+
+  user = "vagrant"
+  user_home = "/home/#{user}"
+
+  config.vm.synced_folder "../../../.git", "#{user_home}/read-only-git", :mount_options => ["ro"]
+  config.vm.synced_folder "../shared", "#{user_home}/shared"
+  config.vm.synced_folder File.expand_path("~/.aws"), "#{user_home}/.aws", :mount_options => ["ro"]
+
+  # Bring the .git repository into the VM
+  config.vm.provision "shell", privileged: false, inline: <<-SHELL
+    mkdir -p #{user_home}/greeneyes
+    cp -R #{user_home}/read-only-git #{user_home}/greeneyes/.git
+  SHELL
+
+  # Reset the directory to the most recent commit on the current branch from the host. This gets around the problem
+  #   of Windows not having an executable flag on files.
+  config.vm.provision "shell", privileged: false, inline: <<-SHELL
+    set -e
+
+    cd greeneyes
+    git reset --hard HEAD
+    cd -
+    ln -s #{user_home}/greeneyes/blog-posts/001/guest guest
+    ln -s #{user_home}/greeneyes/greengrass greengrass
+    chmod g+w shared/
+    rm -f shared/*.html
+  SHELL
+
+  config.vm.provision "shell", inline: <<-SHELL
+    set -e
+
+    cloud-init status --wait
+    apt-get update -y
+    apt-get install -y linux-generic v4l-utils unzip openjdk-17-jre-headless python3-pip xtail jq
+    python3 -m pip install -U git+https://github.com/aws-greengrass/aws-greengrass-gdk-cli.git@v1.1.0
+    python3 -m pip install 'boto3-stubs[s3,iot,iam,greengrass]'
+    sudo usermod -a -G video vagrant
+  SHELL
+
+  config.vm.provision "shell", inline: <<-SHELL
+    set -e
+
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+    unzip /tmp/awscliv2.zip -d /tmp/
+    /tmp/aws/install
+    rm -rf /tmp/aws /tmp/awscliv2.zip
+  SHELL
+
+  # Create a unique ID for our S3 bucket that will be used to create components
+  config.vm.provision "shell", privileged: false, inline: <<-SHELL
+    . #{user_home}/greengrass/shared.sh
+    set -e
+
+    echo "Creating S3 bucket [$S3_BUCKET_ID]"
+    aws s3 mb s3://$S3_BUCKET_ID
+  SHELL
+
+  # Set up the path for the Greengrass and guest directories
+  config.vm.provision "shell", privileged: false, inline: <<-SHELL
+    echo 'export PATH=$PATH:#{user_home}/greengrass:#{user_home}/guest' >> #{user_home}/.bashrc
+  SHELL
+
+  # Installing kernel modules above requires a reboot. Don't use the reload module or it will add the USB filters more than once.
+  config.vm.provision "shell", privileged: false, inline: <<-SHELL
+    sudo reboot
+  SHELL
+end
+
+# From https://stackoverflow.com/a/45612332/796579
+def provisioned?(vm_name='default', provider='virtualbox')
+  File.exists?(File.join(File.dirname(__FILE__),".vagrant/machines/#{vm_name}/#{provider}/action_provision"))
+end
+
+def explicit_provisioning?()
+   (ARGV.include?("reload") && ARGV.include?("--provision")) || ARGV.include?("provision")
+end

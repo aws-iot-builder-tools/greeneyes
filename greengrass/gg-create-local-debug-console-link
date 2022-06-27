@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+SCRIPT_PATH=$(dirname -- "${BASH_SOURCE[0]}") || {
+  >&2 echo "Could not find the script directory. Exiting."
+  exit 1
+}
+. "$SCRIPT_PATH"/shared.sh
+
+DATA=$(gg-local-debug-console-password)
+USERNAME=$(echo "$DATA" | grep ^Username: | sed 's/^Username: //')
+PASSWORD=$(echo "$DATA" | grep ^Password: | sed 's/^Password: //')
+
+echo "<script>window.location.replace(\"http://$USERNAME:$PASSWORD@localhost:1441\");</script>" > ~/shared/local-debug-console.html

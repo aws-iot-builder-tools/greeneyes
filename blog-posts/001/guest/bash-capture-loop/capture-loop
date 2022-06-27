@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+set -e
+
+SCRIPT_PATH=$(dirname -- "${BASH_SOURCE[0]}") || {
+  echo "Could not find the script directory. Exiting."
+  exit 1
+}
+PATH="$SCRIPT_PATH:$PATH"
+
+SHARED_DIR="/home/vagrant/shared"
+[ -d "$SHARED_DIR" ] && cd $SHARED_DIR
+
+while true; do
+  # Get the number of images captured
+  FILE_COUNT=$(find . -name "*.jpg" | wc -l)
+
+  # If the number of images is larger than 10 then we need to do some cleanup
+  while [ "$FILE_COUNT" -gt "10" ]; do
+    # Get the oldest file and delete it
+    find . -name "*.jpg" | sort -n | head -n 1 | xargs rm
+
+    # Get the number of images captured
+    FILE_COUNT=$(find . -name "*.jpg" | wc -l)
+  done
+
+  # Capture a single frame to the shared directory
+  capture-one
+
+  # Sleep for one second
+  sleep 1
+done

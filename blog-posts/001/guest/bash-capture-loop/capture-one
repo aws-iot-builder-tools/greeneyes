@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+set -e
+
+SHARED_DIR="/home/vagrant/shared"
+[ -d "$SHARED_DIR" ] && cd $SHARED_DIR
+
+v4l2-ctl --device /dev/video0 --set-fmt-video=width=1280,height=720,pixelformat=MJPG --stream-mmap --stream-to="$(date +%s)".jpg --stream-count=1

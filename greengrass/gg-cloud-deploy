@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+SCRIPT_PATH=$(dirname -- "${BASH_SOURCE[0]}") || {
+  >&2 echo "Could not find the script directory. Exiting."
+  exit 1
+}
+. "$SCRIPT_PATH"/shared.sh
+
+require_cli
+
+set -e
+
+# Build components in the guest and the shared directories
+readarray GUEST_COMPONENT_PATHS < <(find -L "$GUEST_PATH" \( -name "gdk-config.json" -o -name "gdk-config.json.template" \) -not -path "$GUEST_PATH""*/zip-build/*" -exec dirname {} \; | sort | uniq)
+readarray SHARED_COMPONENT_PATHS < <(find -L "$SHARED_PATH" \( -name "gdk-config.json" -o -name "gdk-config.json.template" \) -not -path "$SHARED_PATH""*/zip-build/*" -exec dirname {} \; | sort | uniq)
+
+# Combine the list of components
+COMPONENT_PATHS=("${GUEST_COMPONENT_PATHS[@]}" "${SHARED_COMPONENT_PATHS[@]}")
+
+# Build and publish first so we only deploy if everything is successful
+for COMPONENT_PATH in "${COMPONENT_PATHS[@]}"; do
+  # Remove trailing newline from COMPONENT_PATH
+  CLEAN_COMPONENT_PATH=$(printf '%s' "$COMPONENT_PATH")
+
+  component-build "$CLEAN_COMPONENT_PATH"
+  component-publish "$CLEAN_COMPONENT_PATH"
+done
+
+# Deploy everything
+for COMPONENT_PATH in "${COMPONENT_PATHS[@]}"; do
+  # Remove trailing newline from COMPONENT_PATH
+  CLEAN_COMPONENT_PATH=$(printf '%s' "$COMPONENT_PATH")
+
+  component-deploy "$CLEAN_COMPONENT_PATH"
+done
