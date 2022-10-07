@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+SCRIPT_PATH=$(dirname -- "${BASH_SOURCE[0]}") || {
+  >&2 echo "Could not find the script directory. Exiting."
+  exit 1
+}
+. "$SCRIPT_PATH"/shared.sh
+
+echo "Script path: $SCRIPT_PATH"
+echo "Greengrass root: $GREENGRASS_ROOT"
+echo "Recipe dir: $RECIPE_DIR"
+echo "Artifact dir: $ARTIFACT_DIR"
+echo "Region: $REGION"
+echo "Account ID: $ACCOUNT_ID"
+echo "Machine ID: $MACHINE_ID"
+echo "S3 bucket ID: $S3_BUCKET_ID"
+echo "Java: $JAVA"
+echo "Thing name: $THING_NAME"
+echo "Thing group name: $THING_GROUP_NAME"
+echo "TES role name: $TES_ROLE_NAME"
+echo "S3 policy name: $S3_POLICY_NAME"
+echo "S3 policy ARN: $S3_POLICY_ARN"

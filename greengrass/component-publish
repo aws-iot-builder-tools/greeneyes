@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+COMPONENT_PATH=$1
+
+SCRIPT_PATH=$(dirname -- "${BASH_SOURCE[0]}") || {
+  >&2 echo "Could not find the script directory. Exiting."
+  exit 1
+}
+. "$SCRIPT_PATH"/shared.sh
+
+validate_component "$COMPONENT_PATH"
+require_cli
+
+set -e
+
+cd "$COMPONENT_PATH"
+gdk-setup "$COMPONENT_PATH"
+gdk component publish

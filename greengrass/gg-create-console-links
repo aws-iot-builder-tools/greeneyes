@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+SCRIPT_PATH=$(dirname -- "${BASH_SOURCE[0]}") || {
+  >&2 echo "Could not find the script directory. Exiting."
+  exit 1
+}
+. "$SCRIPT_PATH"/shared.sh
+
+echo "<ul>" > ~/shared/aws-console-links.html
+echo "  <li><a href=\"$S3_LINK\" target="_blank">S3 bucket [$S3_BUCKET_ID]</a></li>" >> ~/shared/aws-console-links.html
+echo "  <li><a href=\"$THING_LINK\" target="_blank">AWS IoT thing [$THING_NAME]</a></li>" >> ~/shared/aws-console-links.html
+echo "  <li><a href=\"$THING_GROUP_LINK\" target="_blank">AWS IoT thing group [$THING_GROUP_NAME]</a></li>" >> ~/shared/aws-console-links.html
+echo "  <li><a href=\"$TES_ROLE_LINK\" target="_blank">IAM role for Greengrass Token Exchange Service [$TES_ROLE_NAME]</a></li>" >> ~/shared/aws-console-links.html
+echo "  <li><a href=\"$S3_POLICY_LINK\" target="_blank">IAM policy for S3 bucket access [$S3_POLICY_NAME]</a></li>" >> ~/shared/aws-console-links.html
+echo "</ul>" >> ~/shared/aws-console-links.html

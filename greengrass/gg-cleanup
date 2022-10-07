@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+
+import boto3
+import os
+import pprint
+import subprocess
+
+from mypy_boto3_s3.client import S3Client
+from mypy_boto3_iot.client import IoTClient
+
+# Change to the directory of this script
+abspath = os.path.abspath(__file__)
+dname = os.path.dirname(abspath)
+os.chdir(dname)
+
+SHARED_SCRIPT = "shared.sh"
+
+if not os.path.isfile(SHARED_SCRIPT):
+    print(f"{SHARED_SCRIPT} not found")
+    exit(1)
+
+command = f"bash -c \"set -a && source {SHARED_SCRIPT} && env\""
+for line in subprocess.getoutput(command).split("\n"):
+    split_index = line.find("=")
+    key, value = line[0:split_index], line[split_index + 1:]
+    os.environ[key] = value
+
+command = f"gg-stop"
+print(subprocess.getoutput(command))
+
+env = os.environ
+
+print(env['CONSOLE_PREFIX'])
+
+print(f"WARNING! WARNING! This script is going to remove all of the AWS resources related to instance of Greengrass on this machine.")
+print(f"")
+print(f"The following resources will be permanently removed:")
+print(f"  - S3 bucket [{env['S3_BUCKET_ID']}] and all of its contents")
+print(f"    - {env['S3_LINK']}")
+print(f"  - AWS IoT Thing [{env['THING_NAME']}], all attached certificates, and all policies attached to those certificates")
+print(f"    - {env['THING_LINK']}")
+print(f"  - AWS IoT Thing Group [{env['THING_GROUP_NAME']}]")
+print(f"    - {env['THING_GROUP_LINK']}")
+print(f"  - IAM role for Greengrass Token Exchange Service [{env['TES_ROLE_NAME']}]")
+print(f"    - {env['TES_ROLE_LINK']}")
+print(f"  - IAM policy for S3 bucket access [{env['S3_POLICY_NAME']}]")
+print(f"    - {env['S3_POLICY_LINK']}")
+print()
+print()
+
+while True:
+  print("Do you wish to remove all of the listed AWS resources?")
+
+  choice = input()
+
+  if choice == "N":
+    exit(1)
+
+  if choice == "Y":
+    break
+
+  print("Please answer Y for yes or N or no.")
+
+s3_client: S3Client = boto3.client("s3", region_name=env['REGION'])
+iot_client: IoTClient = boto3.client("iot", region_name=env['REGION'])
+
+print(f"Deleting S3 bucket [{env['S3_BUCKET_ID']}]")
+s3_client.delete_bucket(Bucket=env['S3_BUCKET_ID'])
+x = iot_client.list_thing_principals(thingName=env['THING_NAME'])
+pprint.pprint(x)
+
+##IOT_ARN_PREFIX="arn:aws:iot:${REGION}:${ACCOUNT_ID}"
+##THING_ARN="${IOT_ARN_PREFIX}:thing/${THING_NAME}"
+#
+# THING_PRINCIPALS=$(aws iot list-thing-principals --thing-name "$THING_NAME" --query principals --output text | tr -s ' \t' '\n')
+#
+# echo "a: ${#THING_PRINCIPALS[@]}"
+# if [ ${#THING_PRINCIPALS[@]} -eq 0 ]; then
+#  echo "No principals attached to $THING_NAME"
+# else
+#  for THING_PRINCIPAL in "${THING_PRINCIPALS[@]}"; do
+#    echo "Detaching $THING_PRINCIPAL"
+#    aws iot detach-thing-principal --thing-name "$THING_NAME" --principal "$THING_PRINCIPAL"
+#
+#    # Remove the certificate
+#    echo "Deleting $THING_PRINCIPAL"
+#    THING_PRINCIPAL=$(echo "$THING_PRINCIPAL" | sed 's/^.*cert\///')
+#    aws iot delete-certificate --certificate-id "$THING_PRINCIPAL"
+#  done
+# fi
+#

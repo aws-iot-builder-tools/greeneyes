@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+SCRIPT_PATH=$(dirname -- "${BASH_SOURCE[0]}") || {
+  echo "Could not find the script directory. Exiting."
+  exit 1
+}
+. "$SCRIPT_PATH"/shared.sh
+
+if [ -d "$GREENGRASS_ROOT" ]; then
+  echo "WARNING! WARNING! $GREENGRASS_ROOT already exists!"
+  echo ""
+  echo "This directory will be deleted if you continue."
+
+  while true; do
+    read -p "Do you wish to overwrite the existing installation of Greengrass? " yn
+    case $yn in
+    [Yy]*) break ;;
+    [Nn]*) exit ;;
+    *) echo "Please answer Y for yes or N or no." ;;
+    esac
+  done
+
+  gg-stop
+
+  echo Killing old Java processes if any exist...
+  sudo killall -9 java
+  sleep 5
+  echo Cleaning up the Greengrass directory...
+  sudo rm -rf "$GREENGRASS_ROOT"
+fi
+
+echo Deleting thing group named $THING_GROUP_NAME if it exists to avoid initial deployment issues...
+aws iot delete-thing-group --thing-group-name "$THING_GROUP_NAME"
+
+mkdir -p "$GREENGRASS_ROOT"
+cd "$GREENGRASS_ROOT" || {
+  echo "Failed to change to the Greengrass directory ($GREENGRASS_ROOT)"
+  exit 1
+}
+
+set -e
+echo Downloading Greengrass...
+if [ ! -f "../greengrass-nucleus-latest.zip" ]; then
+  curl https://d2s8p88vqu9w66.cloudfront.net/releases/greengrass-nucleus-latest.zip -o ../greengrass-nucleus-latest.zip
+fi
+
+echo Unzipping Greengrass...
+rm -rf GreengrassInstaller
+unzip ../greengrass-nucleus-latest.zip -d GreengrassInstaller
+
+echo Installing Greengrass...
+
+sudo -E $JAVA -Droot="$GREENGRASS_ROOT" -Dlog.store=FILE \
+  -jar ./GreengrassInstaller/lib/Greengrass.jar \
+  --aws-region us-east-1 \
+  --thing-name "$THING_NAME" \
+  --thing-group-name "$THING_GROUP_NAME" \
+  --thing-policy-name "$THING_NAME"Policy \
+  --tes-role-name "$THING_NAME"TESRole \
+  --tes-role-alias-name "$THING_NAME"TESAlias \
+  --component-default-user ggc_user:ggc_group \
+  --provision true \
+  --setup-system-service true \
+  --deploy-dev-tools true
+
+sudo usermod -a -G video ggc_user
+sudo usermod -a -G vagrant ggc_user
+
+# Check if the policy exists
+set +e
+aws iam get-policy --policy-arn "$S3_POLICY_ARN" &>/dev/null
+
+if [ $? -ne 0 ]; then
+  set -e
+  S3_POLICY="{ \"Version\": \"2012-10-17\", \"Statement\": [ { \"Effect\": \"Allow\", \"Action\": [ \"s3:*\" ], \"Resource\": [ \"arn:aws:s3:::$S3_BUCKET_ID/*\" ] } ] }"
+  S3_POLICY_ARN=$(aws iam create-policy --policy-name "$S3_POLICY_NAME" --policy-document "$S3_POLICY" --query Policy.Arn --output text)
+  echo "Greengrass S3 access policy [$S3_POLICY_ARN] created for bucket [$S3_BUCKET_ID]"
+  aws iam attach-role-policy --role-name "$TES_ROLE_NAME" --policy-arn "$S3_POLICY_ARN"
+  echo "Greengrass S3 access policy [$S3_POLICY_ARN] attached to role [$TES_ROLE_NAME]"
+fi
+
+set -e
+mkdir -p "$RECIPE_DIR"
+mkdir -p "$ARTIFACT_DIR"
+
+echo "Waiting for the Greengrass CLI to become available..."
+sleep 10
+
+while [ ! -f "$CLI_PATH" ]; do
+  echo "Trying again in 5 seconds..."
+  sleep 5
+done
+
+echo "Getting the latest version of the local debug console..."
+LOCAL_DEBUG_CONSOLE="aws.greengrass.LocalDebugConsole"
+LATEST_VERSION=$(component-latest-version "PUBLIC" "arn:aws:greengrass:us-east-1:aws:components:$LOCAL_DEBUG_CONSOLE")
+
+if [ $? -ne 0 ]; then
+  echo "Failed to get the latest version of the Greengrass local debug console"
+  echo "  [$LATEST_VERSION]"
+  exit 1
+fi
+
+echo "Deploying local debug console [$LATEST_VERSION]..."
+gg-cli deployment create --merge "$LOCAL_DEBUG_CONSOLE=$LATEST_VERSION"  --update-config='{ "'$LOCAL_DEBUG_CONSOLE'": { "MERGE": { "bindHostname": "0.0.0.0", "httpsEnabled": "false" } } }'
+
+echo "Setting up crontab to generate local debug console link..."
+crontab -l | { cat; echo '* * * * * /home/vagrant/greengrass/gg-create-local-debug-console-link'; } | crontab -
+
+echo "Creating AWS console links..."
+gg-create-console-links

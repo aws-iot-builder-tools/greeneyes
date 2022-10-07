@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+SCRIPT_PATH=$(dirname -- "${BASH_SOURCE[0]}") || {
+  >&2 echo "Could not find the script directory. Exiting."
+  exit 1
+}
+. "$SCRIPT_PATH"/shared.sh
+
+sudo xtail "$GREENGRASS_ROOT"/logs

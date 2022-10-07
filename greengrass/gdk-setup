@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+COMPONENT_PATH=$1
+
+SCRIPT_PATH=$(dirname -- "${BASH_SOURCE[0]}") || {
+  echo >&2 "Could not find the script directory. Exiting."
+  exit 1
+}
+. "$SCRIPT_PATH"/shared.sh
+
+validate_component "$COMPONENT_PATH"
+
+if [ ! -f "gdk-config.json.template" ]; then
+  echo "No gdk-config.json.template. Using gdk-config.json without changes."
+  exit 0
+fi
+
+set -e
+cp gdk-config.json.template gdk-config.json.temp
+
+# Set the author
+jq -r '.component.temp = (.component | keys | .[0]) | .component[.component.temp].author = "BlogReader" | del(.component.temp)' gdk-config.json.temp >gdk-config.json.temp1
+mv gdk-config.json.temp1 gdk-config.json.temp
+
+# Set the bucket prefix
+jq -r '.component.temp = (.component | keys | .[0]) | .component[.component.temp].publish.bucket = "'"$S3_BUCKET_PREFIX"'" | del(.component.temp)' gdk-config.json.temp >gdk-config.json.temp1
+mv gdk-config.json.temp1 gdk-config.json.temp
+
+# Set the region
+jq -r '.component.temp = (.component | keys | .[0]) | .component[.component.temp].publish.region = "'"$REGION"'" | del(.component.temp)' gdk-config.json.temp >gdk-config.json.temp1
+mv gdk-config.json.temp1 gdk-config.json.temp
+
+mv gdk-config.json.temp gdk-config.json
