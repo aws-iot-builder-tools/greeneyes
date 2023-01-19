@@ -16,7 +16,9 @@ aws-console-links.html
 bin
 blog-posts/001/shared
 build
+gdk-config.json
 greengrass-build
 local-debug-console.html
 obj
 target
+zip-build

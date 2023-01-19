@@ -1,0 +1,27 @@
+---
+RecipeFormatVersion: "2020-01-25"
+ComponentName: "{COMPONENT_NAME}"
+ComponentVersion: "{COMPONENT_VERSION}"
+ComponentDescription: "This is simple Hello World component written in C#."
+ComponentPublisher: "{COMPONENT_AUTHOR}"
+ComponentConfiguration:
+  DefaultConfiguration:
+    accessControl:
+      aws.greengrass.ipc.mqttproxy:
+        "{COMPONENT_NAME}:mqttproxy:1":
+          operations:
+            - "aws.greengrass#PublishToIoTCore"
+          resources:
+            - "*"
+ComponentDependencies:
+  aws.greengrass.TokenExchangeService:
+    VersionRequirement: '^2.0.0'
+    DependencyType: HARD
+Manifests:
+  - Platform:
+      os: all
+    Artifacts:
+      - URI: "s3://BUCKET_NAME/COMPONENT_NAME/COMPONENT_VERSION/GGCSharp.zip"
+        Unarchive: ZIP
+    Lifecycle:
+      Run: "chmod +x {artifacts:decompressedPath}/GGCSharp/GGCSharp && {artifacts:decompressedPath}/GGCSharp/GGCSharp"
