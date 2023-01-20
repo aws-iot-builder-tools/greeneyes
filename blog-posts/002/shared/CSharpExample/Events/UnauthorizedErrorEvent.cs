@@ -1,3 +1,4 @@
+using System;
 using Amazon.Runtime.EventStreams;
 
 namespace GGCSharp.Events

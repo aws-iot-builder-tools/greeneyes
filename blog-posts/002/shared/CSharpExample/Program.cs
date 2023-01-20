@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
+using static LanguageExt.Prelude;
 
 namespace GGCSharp
 {
@@ -17,6 +19,7 @@ namespace GGCSharp
             while (Running)
             {
                 var currentProcess = Process.GetCurrentProcess();
+                Console.WriteLine($"{ThingTopic}");
                 AwsIotGreengrassIpc.Publish(ThingTopic, 0, $"Hello from C# process: {currentProcess.WorkingSet64}");
                 Thread.Sleep(10000);
             }
